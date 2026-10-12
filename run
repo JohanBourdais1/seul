@@ -1,0 +1,24 @@
+#!/bin/bash -p
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+CHALLPATH=./
+
+STTY=$(stty -g)
+stty intr ^-
+
+echo "Launching the vulnerable machine..."
+echo ""
+
+qemu-system-arm -m 32M \
+    -M vexpress-a9 \
+    -kernel $CHALLPATH/zImage \
+    -dtb vexpress-v2p-ca9.dtb \
+    -monitor /dev/null \
+    -initrd $CHALLPATH/initramfs.img \
+    -sd $CHALLPATH/passwd.img \
+    -append "console=ttyAMA0,115200 oops=panic panic=1 loglevel=0" \
+    -nographic -no-reboot \
+    -snapshot -s -S
+
+stty "${STTY}"
+

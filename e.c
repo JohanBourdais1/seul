@@ -1,0 +1,120 @@
+void* syscall5(
+    void* number,
+    void* arg1,
+    void* arg2,
+    void* arg3,
+    void* arg4,
+    void* arg5
+);
+
+typedef unsigned long int uintptr; /* size_t */
+typedef long int intptr; /* ssize_t */
+
+__attribute__((naked))
+void* syscall5(void* number, void* arg1, void* arg2, void* arg3, void* arg4, void* arg5)
+{
+    __asm__ volatile(
+        "mov r7, r0\n"
+        "mov r0, r1\n"
+        "mov r1, r2\n"
+        "mov r2, r3\n"
+        "ldr r3, [sp, #0]\n"
+        "ldr r4, [sp, #4]\n"
+        "svc #0\n"
+        "bx lr\n"
+    );
+}
+
+static
+intptr write(int fd, void const* data, uintptr nbytes)
+{
+    return (intptr)
+        syscall5(
+            (void*)4, /* SYS_write */
+            (void*)(intptr)fd,
+            (void*)data,
+            (void*)nbytes,
+            0, /* ignored */
+            0  /* ignored */
+        );
+}
+
+static void vuln_copy(char* dst, const char* src)
+{
+    while (*src)
+    {
+        *dst = *src;
+        dst++;
+        src++;
+    }
+    *dst = 0;
+}
+
+static void print_hex(unsigned int val)
+{
+    char buf[11];
+    char hexchars[17];
+    int i;
+
+    hexchars[0] = '0';
+    hexchars[1] = '1';
+    hexchars[2] = '2';
+    hexchars[3] = '3';
+    hexchars[4] = '4';
+    hexchars[5] = '5';
+    hexchars[6] = '6';
+    hexchars[7] = '7';
+    hexchars[8] = '8';
+    hexchars[9] = '9';
+    hexchars[10] = 'a';
+    hexchars[11] = 'b';
+    hexchars[12] = 'c';
+    hexchars[13] = 'd';
+    hexchars[14] = 'e';
+    hexchars[15] = 'f';
+    hexchars[16] = 0;
+    
+    buf[0] = '0';
+    buf[1] = 'x';
+    buf[10] = 0;
+
+    for (i = 9; i >= 2; i--)
+    {
+        buf[i] = hexchars[val & 0xf];
+        val >>= 4;
+    }
+    write(1, buf, 10);
+    write(1, "\n", 1);
+}
+
+int main()
+{
+    int z = 0xcafe;
+    char buffer[16]; /* déclaré après z : vulnérabe � l'écraseme*/
+    print_hex((unsigned int)(uintptr)&z);
+    print_hex((unsigned int)(uintptr)&buffer[0]);
+
+    write(1, "Avant overflow: z = ", 21);
+    print_hex((unsigned int)z);
+
+    write(1, "\n", 1);
+    /* dépassement volontaire du buffer pour écraser z */
+    vuln_copy(buffer, "AAAAAAAAAAAAAAAA\xef\xbe\xad\xde");
+
+    write(1, "Apres overflow: z = ", 21);
+    print_hex((unsigned int)z);
+
+    write(1, "\n", 1);
+    return 0;
+}
+
+__attribute__((naked, noreturn, used))
+void _start(void)
+{
+    __asm__ volatile(
+        "bl main\n"
+        "mov r7, #1\n"
+        "mov r0, #0\n"
+        "svc #0\n"
+    );
+}
