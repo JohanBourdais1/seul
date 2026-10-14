@@ -18,7 +18,7 @@ qemu-system-arm -m 32M \
     -sd $CHALLPATH/passwd.img \
     -append "console=ttyAMA0,115200 oops=panic panic=1 loglevel=0" \
     -nographic -no-reboot \
-    -snapshot -s -S
+    -snapshot
 
 stty "${STTY}"
 
